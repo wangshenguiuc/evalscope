@@ -21,8 +21,8 @@ Please reason step by step, and put your final answer within \boxed{{}}.
 # https://huggingface.co/datasets/MathArena/hmmt_feb_2025
 @register_benchmark(
     BenchmarkMeta(
-        name='hmmt25',
-        pretty_name='HMMT25',
+        name='hmmt_feb_2025',
+        pretty_name='HMMT_Feb_2025',
         dataset_id='evalscope/hmmt_feb_2025',
         description="""
 ## Overview
@@ -64,7 +64,7 @@ HMMT February 2025 (MathArena) is a challenging evaluation benchmark derived fro
         prompt_template=PROMPT_TEMPLATE,
     )
 )
-class HMMT25Adapter(DefaultDataAdapter):
+class HMMTFeb2025Adapter(DefaultDataAdapter):
 
     def record_to_sample(self, record: Dict[str, Any]) -> Sample:
         problem = str(record.get('problem', '')).strip()

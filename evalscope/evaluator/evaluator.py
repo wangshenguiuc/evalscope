@@ -141,6 +141,9 @@ class DefaultEvaluator(Evaluator):
             task_config=task_config,
         )
 
+        # Incremented in _run_pool when a work item raises and ignore_errors=True
+        self.sample_error_count: int = 0
+
     def eval(self) -> Report:
         """
         Run the complete evaluation process.
@@ -296,6 +299,7 @@ class DefaultEvaluator(Evaluator):
             tb_str = traceback.format_exc()
             logger.error(f'Processing item in subset={item.subset!r} failed: {exc}\nTraceback:\n{tb_str}')
             if self.task_config.ignore_errors:
+                self.sample_error_count += 1
                 logger.warning('Error ignored, continuing with next sample.')
                 return
             raise exc
@@ -471,6 +475,7 @@ class DefaultEvaluator(Evaluator):
         report = self.benchmark.generate_report(
             scores=agg_score_dict, model_name=self.model_name, output_dir=report_path
         )
+        report.failed_samples = int(getattr(self, 'sample_error_count', 0))
 
         # Generate and display a summary table of results
         try:

@@ -1,5 +1,6 @@
 # Copyright (c) Alibaba, Inc. and its affiliates.
 
+import os
 from typing import Any, Dict
 
 from evalscope.api.benchmark import BenchmarkMeta, MultiChoiceAdapter
@@ -9,6 +10,24 @@ from evalscope.constants import Tags
 from evalscope.utils.logger import get_logger
 
 logger = get_logger()
+
+# Avoid flooding the console when the model degenerates (very long / repetitive output).
+_LOG_PRED_PREVIEW_CHARS = 500
+_LOG_FILE_PREVIEW_CHARS = 4000
+
+# Optional: append one line per parse failure (sample_id + truncated preview). No console output.
+#   export CEVAL_PARSE_FAIL_LOG=/path/to/ceval_parse_failures.log
+_CEVAL_PARSE_FAIL_LOG_ENV = 'CEVAL_PARSE_FAIL_LOG'
+
+
+def _preview_for_log(text: str, max_chars: int = _LOG_PRED_PREVIEW_CHARS) -> str:
+    if text is None:
+        return ''
+    s = str(text).replace('\n', '\\n')
+    if len(s) <= max_chars:
+        return s
+    return f'{s[:max_chars]}... (truncated, total {len(text)} chars)'
+
 
 SUBJECT_MAPPING = {
     'computer_network': ['Computer Network', '计算机网络', 'STEM'],
@@ -191,5 +210,19 @@ class CEVALAdapter(MultiChoiceAdapter):
         if match:
             return match.group(1)
         else:
-            logger.warning(f'No valid answer found in prediction: {prediction}')
+            # No WARNING/INFO on console (avoid刷屏). DEBUG 可见；可选写入文件。
+            preview = _preview_for_log(prediction)
+            logger.debug(
+                'No valid answer in prediction (expected 答案：[A-D]); preview: %s',
+                preview,
+            )
+            log_path = os.environ.get(_CEVAL_PARSE_FAIL_LOG_ENV, '').strip()
+            if log_path:
+                try:
+                    sid = getattr(task_state, 'sample_id', None)
+                    longer = _preview_for_log(prediction, max_chars=_LOG_FILE_PREVIEW_CHARS)
+                    with open(log_path, 'a', encoding='utf-8') as f:
+                        f.write(f'[sample_id={sid!r}] no 答案：A-D match | preview={longer!r}\n')
+                except OSError:
+                    pass
             return ''

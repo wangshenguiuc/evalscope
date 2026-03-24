@@ -735,12 +735,12 @@ class TestNativeBenchmark(TestBenchmark):
         }
         self._run_dataset_test('zebralogicbench', dataset_args, limit=5)
 
-    def test_hmmt25(self):
-        """Test HMMT25 dataset."""
+    def test_hmmt_feb_2025(self):
+        """Test HMMT Feb 2025 (hmmt_feb_2025) dataset."""
         dataset_args = {
             'few_shot_num': 0,
         }
-        self._run_dataset_test('hmmt25', dataset_args, limit=10)
+        self._run_dataset_test('hmmt_feb_2025', dataset_args, limit=10)
 
     def test_cl_bench(self):
         """Test CL-bench dataset."""
