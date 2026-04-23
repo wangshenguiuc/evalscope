@@ -51,7 +51,7 @@ Below is the list of supported LLM benchmarks. Click on a benchmark name for det
 | `health_bench` | [HealthBench](../../benchmarks/health_bench.md) | `Knowledge`, `Medical`, `QA` |
 | `hellaswag` | [HellaSwag](../../benchmarks/hellaswag.md) | `Commonsense`, `Knowledge`, `MCQ` |
 | `hle` | [Humanity's-Last-Exam](../../benchmarks/hle.md) | `Knowledge`, `QA` |
-| `hmmt25` | [HMMT25](../../benchmarks/hmmt25.md) | `Math`, `Reasoning` |
+| `hmmt_feb_2025` | [HMMT_Feb_2025](../../benchmarks/hmmt25.md) | `Math`, `Reasoning` |
 | `humaneval` | [HumanEval](../../benchmarks/humaneval.md) | `Coding` |
 | `humaneval_plus` | [HumanEvalPlus](../../benchmarks/humaneval_plus.md) | `Coding` |
 | `ifbench` | [IFBench](../../benchmarks/ifbench.md) | `InstructionFollowing` |

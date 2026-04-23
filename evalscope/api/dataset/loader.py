@@ -135,6 +135,11 @@ class RemoteDataLoader(DataLoader):
                     logger.info(f'Removing dataset_infos.json file at {dataset_infos_path} to avoid datasets errors.')
                     os.remove(dataset_infos_path)
                 # load dataset from Huggingface or local path
+                # Gated Hub 数据集（如 cais/hle）：与 check_hle_verified_overlap 一致传入 token / True
+                load_ds_kwargs = dict(self.kwargs)
+                if 'token' not in load_ds_kwargs:
+                    hf_tok = os.environ.get('HF_TOKEN') or os.environ.get('HUGGINGFACE_HUB_TOKEN')
+                    load_ds_kwargs['token'] = hf_tok if hf_tok else True
                 dataset = datasets.load_dataset(
                     path=path,
                     name=self.subset if self.subset != 'default' else None,
@@ -142,7 +147,7 @@ class RemoteDataLoader(DataLoader):
                     revision=self.version,
                     trust_remote_code=self.trust_remote,
                     download_mode=hf_download_mode,
-                    **self.kwargs,
+                    **load_ds_kwargs,
                 )
 
             # Only save to disk if not loading from local path

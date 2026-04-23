@@ -1,5 +1,6 @@
 # Copyright (c) Alibaba, Inc. and its affiliates.
 
+import os
 from typing import Any, Dict
 
 from evalscope.api.benchmark import BenchmarkMeta, MultiChoiceAdapter
@@ -9,6 +10,24 @@ from evalscope.constants import Tags
 from evalscope.utils.logger import get_logger
 
 logger = get_logger()
+
+# Avoid flooding the console when the model degenerates (very long / repetitive output).
+_LOG_PRED_PREVIEW_CHARS = 500
+_LOG_FILE_PREVIEW_CHARS = 4000
+
+# Optional: append one line per parse failure (sample_id + truncated preview). No console output.
+#   export CEVAL_PARSE_FAIL_LOG=/path/to/ceval_parse_failures.log
+_CEVAL_PARSE_FAIL_LOG_ENV = 'CEVAL_PARSE_FAIL_LOG'
+
+
+def _preview_for_log(text: str, max_chars: int = _LOG_PRED_PREVIEW_CHARS) -> str:
+    if text is None:
+        return ''
+    s = str(text).replace('\n', '\\n')
+    if len(s) <= max_chars:
+        return s
+    return f'{s[:max_chars]}... (truncated, total {len(text)} chars)'
+
 
 SUBJECT_MAPPING = {
     'computer_network': ['Computer Network', '计算机网络', 'STEM'],
@@ -177,19 +196,43 @@ class CEVALAdapter(MultiChoiceAdapter):
         """
         Extract the answer from the prediction based on the task state.
 
-        Args:
-            prediction (str): The model's prediction string
-            task_state (dict): The current task state containing metadata
-
-        Returns:
-            str: The extracted answer from the prediction
+        Uses multiple regex patterns (inspired by OpenCompass first_option_postprocess)
+        to robustly extract A/B/C/D answers from various Chinese/English formats.
         """
         import re
 
-        # Use regex to find the answer in the format "答案：LETTER"
-        match = re.search(r'答案：([A-D])', prediction)
-        if match:
-            return match.group(1)
-        else:
-            logger.warning(f'No valid answer found in prediction: {prediction}')
-            return ''
+        options = 'ABCD'
+        patterns = [
+            # Chinese patterns (strict first)
+            rf'答案\s*[:：]\s*([{options}])',       # 答案：D / 答案: D
+            rf'答案是?\s*([{options}])',             # 答案D / 答案是D
+            rf'答案应该?是\s*([{options}])',         # 答案应该是D
+            rf'答案为\s*([{options}])',              # 答案为D
+            rf'选择?\s*([{options}])',               # 选D / 选择D
+            rf'故选?\s*([{options}])',               # 故选D
+            rf'只有选?项?\s?([{options}])\s?是?对',  # 只有选项D是对的
+            # English patterns
+            rf'(?i)ANSWER\s*:\s*([{options}])',      # ANSWER: D
+            rf'(?i)the answer is:?\s*\(?([{options}])\)?',  # The answer is D
+            # Fallback: last standalone option letter in the text
+            rf'.*\b([{options}])\b',                 # last occurrence of A/B/C/D
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, prediction)
+            if match:
+                return match.group(1).upper()
+
+        # No WARNING/INFO on console (avoid刷屏). DEBUG 可见；可选写入文件。
+        preview = _preview_for_log(prediction)
+        logger.debug('No valid answer in prediction; preview: %s', preview)
+        log_path = os.environ.get(_CEVAL_PARSE_FAIL_LOG_ENV, '').strip()
+        if log_path:
+            try:
+                sid = getattr(task_state, 'sample_id', None)
+                longer = _preview_for_log(prediction, max_chars=_LOG_FILE_PREVIEW_CHARS)
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(f'[sample_id={sid!r}] no A-D match | preview={longer!r}\n')
+            except OSError:
+                pass
+        return ''

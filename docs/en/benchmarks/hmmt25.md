@@ -1,4 +1,4 @@
-# HMMT25
+# HMMT_Feb_2025
 
 
 ## Overview
@@ -32,7 +32,7 @@ HMMT February 2025 (MathArena) is a challenging evaluation benchmark derived fro
 
 | Property | Value |
 |----------|-------|
-| **Benchmark Name** | `hmmt25` |
+| **Benchmark Name** | `hmmt_feb_2025` |
 | **Dataset ID** | [evalscope/hmmt_feb_2025](https://modelscope.cn/datasets/evalscope/hmmt_feb_2025/summary) |
 | **Paper** | N/A |
 | **Tags** | `Math`, `Reasoning` |
@@ -93,7 +93,7 @@ evalscope eval \
     --model YOUR_MODEL \
     --api-url OPENAI_API_COMPAT_URL \
     --api-key EMPTY_TOKEN \
-    --datasets hmmt25 \
+    --datasets hmmt_feb_2025 \
     --limit 10  # Remove this line for formal evaluation
 ```
 
@@ -107,7 +107,7 @@ task_cfg = TaskConfig(
     model='YOUR_MODEL',
     api_url='OPENAI_API_COMPAT_URL',
     api_key='EMPTY_TOKEN',
-    datasets=['hmmt25'],
+    datasets=['hmmt_feb_2025'],
     limit=10,  # Remove this line for formal evaluation
 )
 

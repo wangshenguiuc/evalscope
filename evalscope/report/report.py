@@ -13,6 +13,9 @@ if TYPE_CHECKING:
 
 logger = get_logger()
 
+# 报告内分数：统一保留小数位数（normalize_score 与 JSON 导出展示）
+REPORT_SCORE_DECIMAL_PLACES = 3
+
 ANALYSIS_PROMPT = """You are an expert AI model evaluator. Analyze the following JSON evaluation results and produce a concise, structured analysis report.
 
 The report must contain exactly four sections with second-level Markdown headers (##):
@@ -40,16 +43,18 @@ Requirements:
 """
 
 
-def normalize_score(score: Union[float, dict, int], keep_num: int = 4) -> Union[float, dict]:
+def normalize_score(
+    score: Union[float, dict, int], keep_num: int = REPORT_SCORE_DECIMAL_PLACES
+) -> Union[float, dict]:
     """
     Normalize score.
 
     Args:
         score: input score, could be float or dict. e.g. 0.12345678 or {'acc': 0.12345678, 'f1': 0.12345678}
-        keep_num: number of digits to keep.
+        keep_num: number of **decimal** places to keep (default REPORT_SCORE_DECIMAL_PLACES).
 
     Returns:
-        Union[float, dict]: normalized score. e.g. 0.1234 or {'acc': 0.1234, 'f1': 0.1234}
+        Union[float, dict]: normalized score. e.g. 0.123 or {'acc': 0.123, 'f1': 0.456}
     """
     if isinstance(score, float):
         score = round(score, keep_num)
@@ -60,6 +65,32 @@ def normalize_score(score: Union[float, dict, int], keep_num: int = 4) -> Union[
     else:
         logger.warning(f'Unknown score type: {type(score)}')
     return score
+
+
+def _coerce_float(val: Any) -> float:
+    """从 JSON 读回时兼容 float / int / 固定小数位字符串。"""
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, str):
+        try:
+            return float(val)
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
+def _floats_to_fixed_decimal_strings(obj: Any, ndigits: int) -> Any:
+    """
+    标准 json 无法让数字字面量保留尾零（0.500 会写成 0.5）。
+    导出报告 JSON 时把所有 float 写成固定 ndigits 位小数的字符串，便于阅读且 float(s) 等价。
+    """
+    if isinstance(obj, float):
+        return format(round(obj, ndigits), f'.{ndigits}f')
+    if isinstance(obj, dict):
+        return {k: _floats_to_fixed_decimal_strings(v, ndigits) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_floats_to_fixed_decimal_strings(v, ndigits) for v in obj]
+    return obj
 
 
 @dataclass
@@ -90,7 +121,11 @@ class Category:
 
     @classmethod
     def from_dict(cls, data: dict):
-        subsets = [Subset(**subset) for subset in data.get('subsets', [])]
+        subsets = []
+        for raw in data.get('subsets', []):
+            s = dict(raw)
+            s['score'] = _coerce_float(s.get('score', 0))
+            subsets.append(Subset(**s))
         return cls(name=data['name'], subsets=subsets)
 
 
@@ -135,22 +170,29 @@ class Report:
     score: float = 0.0
     metrics: List[Metric] = field(default_factory=list)
     analysis: str = 'N/A'
+    # Samples that raised during pool eval when ignore_errors=True (not counted in score aggregation)
+    failed_samples: int = 0
 
     def __post_init__(self):
-        self.score = self.metrics[0].score  # NOTE: only use the first metric by default
+        # 无样本 / 评测未产出 metric 时 metrics 可能为空，避免 list index out of range
+        if self.metrics:
+            self.score = self.metrics[0].score  # NOTE: only use the first metric by default
+        else:
+            self.score = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
     def to_json_str(self) -> str:
-        return json.dumps(self.to_dict(), indent=4, ensure_ascii=False)
+        payload = _floats_to_fixed_decimal_strings(asdict(self), REPORT_SCORE_DECIMAL_PLACES)
+        return json.dumps(payload, indent=4, ensure_ascii=False)
 
     def to_json(self, json_file: str):
         # ensure the directory exists
         os.makedirs(os.path.dirname(json_file), exist_ok=True)
-        # write the report to a json file
+        payload = _floats_to_fixed_decimal_strings(asdict(self), REPORT_SCORE_DECIMAL_PLACES)
         with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(self.to_dict(), f, indent=4, ensure_ascii=False)
+            json.dump(payload, f, indent=4, ensure_ascii=False)
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -160,10 +202,11 @@ class Report:
             dataset_name=data['dataset_name'],
             dataset_pretty_name=data.get('dataset_pretty_name'),
             dataset_description=data.get('dataset_description'),
-            score=data['score'],
+            score=_coerce_float(data.get('score', 0)),
             model_name=data['model_name'],
             metrics=metrics,
             analysis=data.get('analysis', 'N/A'),
+            failed_samples=int(data.get('failed_samples', 0) or 0),
         )
 
     @classmethod

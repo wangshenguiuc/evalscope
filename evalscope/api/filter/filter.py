@@ -24,7 +24,10 @@ class Filter(ABC):
         """
         Allows the filter to be called like a function.
         """
-        return self.apply([instance])[0]
+        out = self.apply([instance])
+        if not out:
+            return instance if instance is not None else ""
+        return out[0]
 
 
 @dataclass
@@ -49,7 +52,10 @@ class FilterEnsemble:
         """
         Allows the filter ensemble to be called like a function.
         """
-        return self.apply([instance])[0]
+        out = self.apply([instance])
+        if not out:
+            return instance if instance is not None else ""
+        return out[0]
 
 
 def build_filter_ensemble(name: str = 'default', filters: Dict[str, Any] = {}) -> FilterEnsemble:

@@ -88,18 +88,22 @@ class OpenAICompatibleAPI(ModelAPI):
 
         self.validate_request_params(request)
 
-        try:
-            # generate completion and save response for model call
-            completion = retry_call(
-                self.client.chat.completions.create,
-                retries=config.retries,
-                sleep_interval=config.retry_interval,
-                **request
-            )
-            # handle streaming response
+        def _create_and_collect():
+            # With stream=True, create() returns a Stream iterator immediately and
+            # the real I/O happens during iteration. Wrapping both steps together
+            # makes mid-stream errors (ReadTimeout, ConnectionReset) retryable —
+            # otherwise they escape retry_call and the sample is dropped.
+            completion = self.client.chat.completions.create(**request)
             if not isinstance(completion, ChatCompletion):
                 completion = collect_stream_response(completion)
+            return completion
 
+        try:
+            completion = retry_call(
+                _create_and_collect,
+                retries=config.retries,
+                sleep_interval=config.retry_interval,
+            )
             response = completion.model_dump()
             self.on_response(response)
 

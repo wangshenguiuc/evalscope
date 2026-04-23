@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "pretty_name": "IMO-AnswerBench",
+    "dataset_id": "OpenEvals/IMO-AnswerBench",
+    "paper_url": null,
+    "tags": [
+      "Math",
+      "Reasoning"
+    ],
+    "metrics": [
+      {
+        "acc": {
+          "numeric": true
+        }
+      }
+    ],
+    "few_shot_num": 0,
+    "eval_split": "train",
+    "train_split": "train",
+    "subset_list": [
+      "algebra",
+      "combinatorics",
+      "geometry",
+      "number theory"
+    ],
+    "description": "IMO-AnswerBench (OpenEvals/HF); 400 short-answer olympiad problems across 4 categories.",
+    "prompt_template": "",
+    "system_prompt": "",
+    "few_shot_prompt_template": "",
+    "aggregation": "mean",
+    "extra_params": {},
+    "sandbox_config": {},
+    "category": "llm"
+  }
+}
